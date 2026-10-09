@@ -1,13 +1,8 @@
-/**
- * Pruebas unitarias de la API webapp-contenedor
- * Herramientas: Jest + Supertest
- * Cada prueba corre contra una base SQLite temporal (no toca data/ ni backups/ reales).
- */
+
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
 
-// --- Base de datos y carpeta de backups aisladas para pruebas ---
 const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "webapp-test-"));
 process.env.DB_PATH = path.join(TMP_DIR, "test.db");
 process.env.BACKUP_DIR = path.join(TMP_DIR, "backups");

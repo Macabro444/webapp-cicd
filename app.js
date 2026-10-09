@@ -12,7 +12,7 @@ const router = express.Router();
 
 // Mensaje de bienvenida. En la demo en vivo se cambia ESTA línea, se hace
 // git push y el pipeline la publica sola en la EC2.
-const MENSAJE_BIENVENIDA = "API de productos v1 — desplegada automáticamente con GitHub Actions";
+const MENSAJE_BIENVENIDA = "API de productos estamos en vivo bebe";
 const APP_VERSION = process.env.APP_VERSION || require("./package.json").version;
 const GIT_SHA = process.env.GIT_SHA || "local";
 

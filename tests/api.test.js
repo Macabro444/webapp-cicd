@@ -1,6 +1,3 @@
-/**
- * Pruebas de las rutas con prefijo /api (URL pública en EC2) y del endpoint de versión.
- */
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
