@@ -1,0 +1,156 @@
+# ═══════════════════════════════════════════════════════════════════════
+#  Pipeline CI/CD — API de productos
+#  git push a main  ➜  pruebas + cobertura  ➜  imagen en Docker Hub
+#                   ➜  despliegue en AWS EC2  ➜  verificación en vivo
+#  Todos los datos sensibles vienen de GitHub Secrets:
+#    DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, EC2_HOST, EC2_USERNAME, EC2_SSH_KEY
+# ═══════════════════════════════════════════════════════════════════════
+name: CI/CD - Docker Hub + AWS EC2
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+# Si llegan dos push seguidos, el despliegue viejo se cancela.
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: webapp
+  CONTAINER_NAME: webapp-container
+
+jobs:
+  # ───────────────────────────── 1. CI ─────────────────────────────
+  test:
+    name: Pruebas y cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Listar archivos de prueba
+        run: npx jest --listTests
+
+      - name: Ejecutar pruebas con cobertura (umbral mínimo 70%)
+        run: npm test
+
+      - name: Publicar resumen de cobertura en el pipeline
+        if: always()
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            node -e '
+              const t = require("./coverage/coverage-summary.json").total;
+              const fila = (k) => `| ${k} | ${t[k].pct}% | ${t[k].covered}/${t[k].total} |`;
+              console.log("## Cobertura de código\n");
+              console.log("| Métrica | % | Cubiertas/Total |\n|---|---|---|");
+              ["statements","branches","functions","lines"].forEach(k => console.log(fila(k)));
+              console.log("\nUmbral exigido: **70%**");
+            ' | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Guardar reporte de cobertura como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ──────────────────── 2. Artefacto: imagen Docker ────────────────────
+  build-and-push:
+    name: Build & push a Docker Hub
+    needs: test
+    if: github.event_name != 'pull_request'   # los PR solo corren pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login en Docker Hub (Personal Access Token)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir y publicar (:latest y :<sha>)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ───────────────────────────── 3. CD ─────────────────────────────
+  deploy-ec2:
+    name: Desplegar en AWS EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Desplegar vía SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            NAME="${{ env.CONTAINER_NAME }}"
+
+            echo "▶ Descargando $IMAGE (el contenedor viejo sigue atendiendo mientras tanto)"
+            sudo docker pull "$IMAGE"
+
+            echo "▶ Reemplazando contenedor"
+            sudo docker stop "$NAME" 2>/dev/null || true
+            sudo docker rm "$NAME" 2>/dev/null || true
+            sudo docker run -d --name "$NAME" \
+              --restart unless-stopped \
+              -p 80:8080 -p 6061:6061 \
+              -v webapp-data:/app/data \
+              -v webapp-backups:/app/backups \
+              "$IMAGE"
+
+            echo "▶ Limpiando imágenes antiguas"
+            sudo docker image prune -af --filter "until=24h" || true
+            sudo docker ps --filter "name=$NAME"
+
+      - name: Verificar que la API pública responde con el nuevo commit
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          for i in $(seq 1 15); do
+            RESP=$(curl -fsS "http://$EC2_HOST/api" || true)
+            if echo "$RESP" | grep -q "${{ github.sha }}"; then
+              echo "✅ API en línea con el commit ${{ github.sha }}"
+              echo "$RESP"
+              echo "### ✅ Despliegue verificado: commit \`${GITHUB_SHA::7}\` en línea" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Intento $i: aún no responde la nueva versión, reintentando en 4s..."
+            sleep 4
+          done
+          echo "❌ La API no respondió con el commit esperado"
+          exit 1

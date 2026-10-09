@@ -1,0 +1,328 @@
+% ════════════════════════════════════════════════════════════════════
+%  Reporte — Proyecto Integrador Parcial 1
+%  Compila con XeLaTeX o pdfLaTeX (Overleaf: Menu → Compiler).
+%  CAPTURAS: guarda tus imágenes en figuras/ con los nombres fig01.png ...
+%  fig13.png (ver docs/GUIA_PASO_A_PASO.md). Si una falta, se dibuja un
+%  recuadro indicando qué captura va ahí.
+% ════════════════════════════════════════════════════════════════════
+\documentclass[12pt,letterpaper]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage[spanish,es-noshorthands]{babel}
+\else
+  \usepackage{fontspec}
+  \usepackage{polyglossia}
+  \setdefaultlanguage{spanish}
+\fi
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage[hidelinks]{hyperref}
+
+% ─────────── DATOS DE LA PORTADA (edítalos) ───────────
+\newcommand{\universidad}{Universidad Tecnológica de Querétaro}
+\newcommand{\carrera}{Ingeniería en Desarrollo y Gestión de Software}
+\newcommand{\materia}{Gestión del Proceso de Desarrollo de Software}
+\newcommand{\titulo}{Proyecto Integrador: Pipeline CI/CD Automatizado para API REST con Docker, GitHub Actions y AWS EC2}
+\newcommand{\integrantes}{NOMBRE COMPLETO DEL ALUMNO --- 2023371181}
+\newcommand{\grupo}{GRUPO}
+\newcommand{\profesor}{NOMBRE DEL PROFESOR}
+\newcommand{\fecha}{Octubre de 2026}
+\newcommand{\repo}{https://github.com/USUARIO/webapp-cicd}
+\newcommand{\ipec}{IP\_EC2}
+% ──────────────────────────────────────────────────────
+
+\setstretch{1.3}
+\sloppy
+\setlength{\emergencystretch}{3em}
+\setlength{\parskip}{0.6em}
+\setlength{\parindent}{0pt}
+\captionsetup{font=small,labelfont=bf}
+
+\definecolor{codebg}{RGB}{246,248,250}
+\definecolor{codegreen}{RGB}{34,134,58}
+\definecolor{codeblue}{RGB}{3,102,214}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, columns=fullflexible,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{codegreen},
+  showstringspaces=false,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {—}{{---}}1 {▶}{{>}}1 {✅}{{[OK]}}4 {❌}{{[X]}}3
+           {═}{{=}}1 {─}{{-}}1 {➜}{{->}}2
+}
+
+% Inserta la captura si existe; si no, un recuadro con la instrucción.
+\newcommand{\captura}[3]{% {archivo}{caption}{qué capturar}
+  \begin{figure}[H]
+    \centering
+    \IfFileExists{figuras/#1}{%
+      \includegraphics[width=0.9\textwidth,height=0.42\textheight,keepaspectratio]{figuras/#1}%
+    }{%
+      \fbox{\parbox[c][5cm][c]{0.85\textwidth}{\centering\small\textcolor{gray}{%
+        \textbf{Captura pendiente:} figuras/#1\\[4pt] #3}}}%
+    }
+    \caption{#2}
+    \label{fig:#1}
+  \end{figure}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small \materia}
+\fancyhead[R]{\small Proyecto Integrador}
+\fancyfoot[C]{\thepage}
+
+\begin{document}
+
+% ═════════════════════════ PORTADA ═════════════════════════
+\begin{titlepage}
+  \centering
+  \IfFileExists{figuras/logo_uteq.png}{\includegraphics[width=0.35\textwidth]{figuras/logo_uteq.png}\par}{}
+  \vspace{1cm}
+  {\LARGE\bfseries \universidad\par}
+  \vspace{0.6cm}
+  {\large \carrera\par}
+  \vspace{1.6cm}
+  {\large\bfseries \materia\par}
+  \vspace{1.2cm}
+  \rule{\linewidth}{0.6pt}\par\vspace{0.4cm}
+  {\Large\bfseries \titulo\par}
+  \vspace{0.2cm}\rule{\linewidth}{0.6pt}\par
+  \vspace{1.6cm}
+  {\large \textbf{Presenta:}\par \integrantes\par}
+  \vspace{0.8cm}
+  {\large \textbf{Grupo:} \grupo\par}
+  \vspace{0.8cm}
+  {\large \textbf{Profesor:} \profesor\par}
+  \vfill
+  {\large Santiago de Querétaro, Qro. --- \fecha\par}
+\end{titlepage}
+
+\tableofcontents
+\listoffigures
+\newpage
+
+% ═════════════════════════ INTRODUCCIÓN ═════════════════════════
+\section{Introducción}
+
+El desarrollo de software moderno ya no termina cuando el código compila en la computadora del programador. Una aplicación sólo genera valor cuando llega a producción de forma confiable, y cada cambio posterior debe poder publicarse sin romper lo que ya funciona. DevOps surge precisamente como un conjunto de prácticas culturales y técnicas que unen el trabajo de desarrollo (\textit{Dev}) con el de operaciones (\textit{Ops}) para acortar el ciclo entre escribir una línea de código y verla funcionando frente al usuario, manteniendo la calidad y la estabilidad del sistema.
+
+Dos prácticas son el núcleo de este enfoque. La \textbf{Integración Continua} (CI, \textit{Continuous Integration}) consiste en que cada cambio que se integra a la rama principal del repositorio dispare automáticamente la compilación y la batería de pruebas, de modo que los errores se detecten minutos después de haberse introducido y no semanas más tarde. El \textbf{Despliegue Continuo} (CD, \textit{Continuous Deployment}) extiende la idea: si las pruebas pasan, el mismo sistema empaqueta la aplicación y la publica en el servidor de producción sin intervención manual. El resultado es un \textit{pipeline}: una cadena de etapas automatizadas donde cada una sólo se ejecuta si la anterior fue exitosa.
+
+Los contenedores son la pieza que hace posible que este pipeline sea reproducible. Una imagen de Docker encapsula el código, el entorno de ejecución y las dependencias exactas de la aplicación, por lo que la misma imagen que se probó en el pipeline es la que se ejecuta en la nube. Esto elimina el clásico problema de “en mi máquina sí funciona”. Las imágenes se almacenan en un registro (\textit{registry}) como Docker Hub, etiquetadas con versiones, lo que permite saber exactamente qué versión del código está corriendo en cada momento y regresar a una anterior si fuera necesario.
+
+En las actividades previas de la materia se construyó, paso a paso, cada uno de estos componentes por separado: primero se instaló el \textit{stack} de herramientas, después se desarrolló una API REST de productos con Node.js, Express y SQLite, se empaquetó en un contenedor, se publicó manualmente en Docker Hub y se desplegó a mano en una instancia de AWS EC2; más tarde se le agregó un servidor de \textit{socket} TCP en el puerto 6061 y, finalmente, una batería de pruebas unitarias con Jest y Supertest. Cada uno de esos pasos requería que una persona ejecutara comandos en el orden correcto.
+
+El objetivo de este Proyecto Integrador es reunir todas esas piezas y eliminar el trabajo manual: con un solo \texttt{git push} a la rama \texttt{main}, GitHub Actions ejecuta las pruebas y mide la cobertura de código (con un umbral mínimo del 70\,\%), construye una imagen Docker optimizada, la publica en Docker Hub con las etiquetas \texttt{:latest} y \texttt{:<hash del commit>}, se conecta por SSH a la instancia EC2, reemplaza el contenedor anterior por la versión nueva expuesta en el puerto 80 y, por último, verifica de forma automática que la API pública responde con el commit recién desplegado. Toda la información sensible (tokens, direcciones IP, usuarios y llaves SSH) se gestiona exclusivamente mediante \textit{GitHub Secrets}, de forma que el repositorio puede ser público sin exponer credenciales.
+
+Este documento describe la arquitectura de la solución, el proceso seguido para configurarla y los resultados obtenidos en cada etapa, acompañados de las evidencias correspondientes.
+
+\newpage
+% ═════════════════════════ DESARROLLO / RESULTADOS ═════════════════════════
+\section{Arquitectura de la solución}
+
+La Figura~\ref{fig:arquitectura} muestra el flujo completo. El desarrollador sólo interactúa con Git; todo lo demás ocurre de forma automática.
+
+\begin{figure}[H]
+\centering
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,frame=none,backgroundcolor=\color{white}]
+ Desarrollador --git push--> GitHub (rama main)
+                                 |
+                                 v
+          +----------- GitHub Actions (.github/workflows/main.yml) -----------+
+          | 1. test            npm ci -> jest --coverage (umbral 70%)          |
+          | 2. build-and-push  docker build -> Docker Hub :latest y :<sha>     |
+          | 3. deploy-ec2      SSH -> docker pull -> stop/rm -> run -p 80      |
+          |                    -> curl /api verifica el commit en linea        |
+          +----------------+-------------------------------------+-------------+
+                           v                                     v
+             Docker Hub  <usuario>/webapp           AWS EC2 (Ubuntu + Docker)
+                                                    :80   -> contenedor :8080
+                                                    :6061 -> contenedor :6061
+                                                    volumen webapp-data (SQLite)
+\end{lstlisting}
+\caption{Arquitectura del pipeline CI/CD.}
+\label{fig:arquitectura}
+\end{figure}
+
+Los componentes del repositorio son: \texttt{app.js} (rutas de Express montadas en \texttt{/api}), \texttt{db.js} (acceso a SQLite), \texttt{socket.js} (servidor TCP), \texttt{server.js} (arranque y apagado limpio), la carpeta \texttt{tests/}, el \texttt{Dockerfile}, el archivo \texttt{.dockerignore} y el flujo \texttt{.github/workflows/main.yml}.
+
+\section{Resultados}
+
+\subsection{API REST}
+
+La API expone 11 endpoints funcionales, lo que supera el mínimo solicitado de seis. Todas las respuestas siguen el esquema normalizado \texttt{\{statusCode, data\}}. La tabla~\ref{tab:endpoints} los resume.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{c l l l}
+\toprule
+\# & Método & Ruta & Descripción \\
+\midrule
+0 & GET & \texttt{/api} & Mensaje, versión y commit desplegado \\
+1 & GET & \texttt{/api/health} & Verificación de estado \\
+2 & GET & \texttt{/api/categorias} & Listar categorías \\
+3 & POST & \texttt{/api/categorias} & Crear categoría \\
+4 & GET & \texttt{/api/productos} & Listar productos (filtro \texttt{?nombre=}) \\
+5 & GET & \texttt{/api/productos/:id} & Obtener un producto \\
+6 & POST & \texttt{/api/productos} & Crear producto \\
+7 & PUT & \texttt{/api/productos/:id} & Actualizar producto \\
+8 & DELETE & \texttt{/api/productos/:id} & Eliminar producto \\
+9 & DELETE & \texttt{/api/productos} & Vaciar tabla \\
+10 & GET & \texttt{/api/backup} & Descargar respaldo de la BD \\
+\bottomrule
+\end{tabular}
+\caption{Endpoints de la API.}
+\label{tab:endpoints}
+\end{table}
+
+El endpoint \texttt{GET /api} es nuevo en este proyecto: devuelve el mensaje de bienvenida y el hash del commit inyectado al construir la imagen. Así se puede comprobar desde el navegador qué versión exacta está en producción, lo cual se aprovecha en la demostración en vivo.
+
+\subsection{Pruebas automatizadas y cobertura}
+
+Se utilizaron Jest y Supertest. Las pruebas se organizan en tres archivos: \texttt{endpoints.test.js} (casos de éxito y de error del usuario para cada endpoint), \texttt{api.test.js} (rutas con prefijo \texttt{/api} y endpoint de versión) y \texttt{socket.test.js} (analizador del protocolo \texttt{\{insert:...\}}/\texttt{\{get:...\}} y servidor TCP real levantado en un puerto libre). Cada archivo usa una base SQLite temporal, por lo que las pruebas nunca tocan los datos reales.
+
+En \texttt{package.json} se configuró \texttt{coverageThreshold} en 70\,\% para sentencias, ramas, funciones y líneas: si la cobertura baja de ese valor, Jest termina con error y el pipeline se detiene antes de construir la imagen. El resultado obtenido fue:
+
+\begin{figure}[H]
+\begin{lstlisting}
+-----------|---------|----------|---------|---------|-------------------
+File       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+-----------|---------|----------|---------|---------|-------------------
+All files  |   97.46 |    93.47 |   95.83 |    98.3 |
+ app.js    |   97.58 |    95.04 |     100 |   98.16 | 176,193
+ db.js     |   93.33 |       50 |     100 |   93.33 | 9
+ socket.js |   98.27 |    96.77 |   83.33 |     100 | 42
+-----------|---------|----------|---------|---------|-------------------
+Test Suites: 3 passed, 3 total
+Tests:       60 passed, 60 total
+\end{lstlisting}
+\caption{Resultado de \texttt{npm test}: 60 pruebas aprobadas y 97.46\,\% de cobertura.}
+\label{fig:coverage-local}
+\end{figure}
+
+\captura{fig01.png}{Ejecución local de las pruebas con reporte de cobertura.}{Terminal con la salida de \texttt{npm test}.}
+
+\subsection{Contenedorización}
+
+El \texttt{Dockerfile} usa una construcción \textit{multi-stage}. La primera etapa (\texttt{deps}) instala los compiladores necesarios para el módulo nativo \texttt{better-sqlite3} y sólo las dependencias de producción con \texttt{npm ci --omit=dev --ignore-scripts}; la segunda etapa (\texttt{runtime}) parte de una imagen limpia de \texttt{node:22-slim} y copia únicamente \texttt{node\_modules} y los archivos fuente. De esta manera, los compiladores, las pruebas y las dependencias de desarrollo no llegan a la imagen final. Además, el contenedor se ejecuta con el usuario sin privilegios \texttt{node}, define un \texttt{HEALTHCHECK} contra \texttt{/api/health} y recibe el hash del commit como argumento de construcción.
+
+El archivo \texttt{.dockerignore} excluye \texttt{node\_modules}, archivos \texttt{.env}, llaves \texttt{.pem}, bases de datos locales, logs, pruebas, reportes de cobertura y la carpeta \texttt{.git}, lo que reduce el contexto de construcción y evita filtrar información sensible dentro de la imagen.
+
+\begin{lstlisting}[caption={Etapa final del Dockerfile.}]
+FROM node:22-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production PORT=8080 SOCKET_PORT=6061 DB_PATH=/app/data/webapp.db
+ARG GIT_SHA=local
+ENV GIT_SHA=$GIT_SHA
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node package.json app.js db.js socket.js server.js ./
+USER node
+EXPOSE 8080 6061
+HEALTHCHECK CMD node -e "require('http').get('http://localhost:8080/api/health', ...)"
+CMD ["node", "server.js"]
+\end{lstlisting}
+
+\subsection{Infraestructura en AWS EC2}
+
+Se aprovisionó una instancia EC2 con Ubuntu Server en la región us-east-2 (Ohio). Docker se instala automáticamente en el primer arranque mediante el script de \textit{User data} \texttt{scripts/ec2-user-data.sh}. El grupo de seguridad permite el tráfico entrante en el puerto 22 (SSH, usado por GitHub Actions), el 80 (HTTP, API pública) y el 6061 (socket TCP).
+
+\captura{fig03.png}{Instancia EC2 en ejecución con su IP pública.}{Consola de EC2: instancia en estado \textit{Running}.}
+\captura{fig04.png}{Reglas de entrada del grupo de seguridad.}{Security Group con los puertos 22, 80 y 6061.}
+
+\subsection{Gestión segura de credenciales}
+
+Ningún dato sensible aparece en el código. Docker Hub se autentica con un \textit{Personal Access Token} con permisos de lectura y escritura, y todos los valores se registraron como \textit{Repository secrets} en GitHub: \texttt{DOCKERHUB\_USERNAME}, \texttt{DOCKERHUB\_TOKEN}, \texttt{EC2\_HOST}, \texttt{EC2\_USERNAME} y \texttt{EC2\_SSH\_KEY}. GitHub enmascara automáticamente estos valores en los logs.
+
+\captura{fig02.png}{Personal Access Token de Docker Hub.}{Docker Hub → Personal access tokens (sin mostrar el valor).}
+\captura{fig05.png}{Secrets del repositorio en GitHub.}{Settings → Secrets and variables → Actions.}
+
+\subsection{Pipeline de GitHub Actions}
+
+El flujo \texttt{.github/workflows/main.yml} se ejecuta en cada \texttt{push} o \texttt{pull\_request} hacia \texttt{main}. Consta de tres trabajos encadenados con \texttt{needs}, de forma que un fallo en cualquiera detiene los siguientes:
+
+\begin{enumerate}
+  \item \textbf{test}: instala dependencias con \texttt{npm ci}, ejecuta las 60 pruebas con cobertura, publica una tabla de cobertura en el resumen del pipeline y guarda el reporte como artefacto.
+  \item \textbf{build-and-push}: (sólo en \texttt{push}) inicia sesión en Docker Hub con el PAT, construye la imagen con Buildx y la publica con las etiquetas \texttt{:latest} y \texttt{:\$\{\{ github.sha \}\}}.
+  \item \textbf{deploy-ec2}: se conecta por SSH a la EC2, descarga la imagen del commit, detiene y elimina el contenedor anterior y levanta el nuevo mapeando \texttt{80:8080} y \texttt{6061:6061} con un volumen persistente para la base de datos. Finalmente consulta \texttt{http://EC2\_HOST/api} hasta confirmar que responde con el nuevo commit.
+\end{enumerate}
+
+\begin{lstlisting}[caption={Paso de despliegue del workflow.}]
+- name: Desplegar via SSH
+  uses: appleboy/ssh-action@v1.2.0
+  with:
+    host: ${{ secrets.EC2_HOST }}
+    username: ${{ secrets.EC2_USERNAME }}
+    key: ${{ secrets.EC2_SSH_KEY }}
+    script: |
+      IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/webapp:${{ github.sha }}"
+      sudo docker pull "$IMAGE"
+      sudo docker stop webapp-container || true
+      sudo docker rm webapp-container || true
+      sudo docker run -d --name webapp-container --restart unless-stopped \
+        -p 80:8080 -p 6061:6061 -v webapp-data:/app/data "$IMAGE"
+\end{lstlisting}
+
+La imagen nueva se descarga \emph{antes} de detener el contenedor anterior, por lo que el servicio sólo se interrumpe durante el par de segundos que tarda en arrancar el contenedor nuevo; además, el volumen \texttt{webapp-data} conserva los productos entre despliegues.
+
+\captura{fig06.png}{Ejecución exitosa del pipeline con sus tres trabajos.}{Pestaña Actions: grafo test → build-and-push → deploy-ec2 en verde.}
+\captura{fig07.png}{Log del trabajo de pruebas con la tabla de cobertura.}{Job “Pruebas y cobertura”, paso \texttt{npm test}.}
+\captura{fig08.png}{Resumen de cobertura publicado en el pipeline.}{Summary del workflow con la tabla “Cobertura de código”.}
+\captura{fig09.png}{Etiquetas de la imagen publicadas en Docker Hub.}{Docker Hub → webapp → Tags: \texttt{latest} y el sha.}
+\captura{fig10.png}{Log del despliegue y verificación automática.}{Job “Desplegar en AWS EC2” con el mensaje “API en línea con el commit”.}
+
+\subsection{API pública}
+
+Una vez terminado el pipeline, la API responde en \texttt{http://\ipec/api}. Se verificaron los endpoints desde el navegador y Postman, así como el socket TCP con \texttt{ncat}.
+
+\captura{fig11.png}{Endpoint \texttt{/api} mostrando el commit desplegado.}{Navegador en \texttt{http://IP\_EC2/api}.}
+\captura{fig12.png}{Pruebas de endpoints contra la IP pública con Postman.}{POST y GET de \texttt{/api/productos}.}
+
+\subsection{Demostración en vivo}
+
+Para evidenciar la automatización completa se modificó la constante \texttt{MENSAJE\_BIENVENIDA} en \texttt{app.js} y se ejecutó:
+
+\begin{lstlisting}
+git commit -am "demo: cambia mensaje de bienvenida"
+git push
+\end{lstlisting}
+
+Sin ninguna otra intervención, el pipeline ejecutó las pruebas, publicó la nueva imagen en Docker Hub y actualizó el servidor; al recargar \texttt{http://\ipec/api} apareció el mensaje nuevo junto con el hash del commit correspondiente.
+
+\captura{fig13.png}{Antes y después del \texttt{git push}: mensaje y commit actualizados.}{Dos capturas de \texttt{/api}: versión anterior y versión nueva.}
+
+\newpage
+% ═════════════════════════ CONCLUSIÓN ═════════════════════════
+\section{Conclusión}
+
+El proyecto integró en un solo flujo automatizado todo lo trabajado durante el parcial: la API REST con SQLite, el socket TCP, las pruebas unitarias y de integración, la contenedorización con Docker y el despliegue en AWS EC2. La diferencia fundamental respecto a las actividades anteriores es que ahora ninguno de esos pasos depende de que una persona recuerde ejecutar los comandos en el orden correcto: basta un \texttt{git push} para que el código pase por las pruebas, se convierta en una imagen versionada y llegue a producción, con una verificación final que confirma que la versión publicada es exactamente la del commit. El umbral de cobertura del 70\,\% funciona como una compuerta de calidad: un cambio que rompe las pruebas o deja código sin probar nunca llega al servidor.
+
+También quedó claro que la automatización exige cuidar la seguridad desde el diseño. Al manejar el token de Docker Hub, la IP y la llave SSH exclusivamente como GitHub Secrets, el repositorio puede ser público sin exponer el acceso a la infraestructura. Del mismo modo, decisiones como la construcción \textit{multi-stage}, el usuario sin privilegios dentro del contenedor, el \texttt{.dockerignore} y el volumen persistente para la base de datos muestran que un pipeline profesional no sólo es rápido, sino también reproducible, seguro y mantenible. Como trabajo futuro, el esquema podría extenderse con un balanceador y dos contenedores para lograr despliegues \textit{blue-green} sin ninguna interrupción, o con infraestructura como código (OpenTofu o Pulumi, vistos en la instalación del \textit{stack}) para que la propia instancia EC2 también se cree automáticamente.
+
+% ═════════════════════════ FUENTES ═════════════════════════
+\section{Fuentes de información}
+\begin{enumerate}
+  \item GitHub. (2026). \textit{GitHub Actions documentation: Workflow syntax and using secrets in GitHub Actions}. \url{https://docs.github.com/en/actions}
+  \item Docker Inc. (2026). \textit{Multi-stage builds} y \textit{Build with GitHub Actions}. Docker Docs. \url{https://docs.docker.com/build/building/multi-stage/}
+  \item Amazon Web Services. (2026). \textit{Amazon EC2 User Guide: Security groups for your EC2 instances}. \url{https://docs.aws.amazon.com/ec2/}
+  \item Meta Open Source. (2026). \textit{Jest Documentation: Configuring Jest --- coverageThreshold}. \url{https://jestjs.io/docs/configuration}
+  \item Kim, G., Humble, J., Debois, P., Willis, J. y Forsgren, N. (2021). \textit{The DevOps Handbook} (2.ª ed.). IT Revolution Press.
+\end{enumerate}
+
+\end{document}

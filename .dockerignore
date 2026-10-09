@@ -1,0 +1,37 @@
+# Dependencias (se instalan dentro de la imagen)
+node_modules
+npm-debug.log*
+
+# Secretos y configuración local
+.env
+.env.*
+*.pem
+*.key
+
+# Datos locales (la BD vive en un volumen en la EC2)
+data
+backups
+*.db
+*.db-shm
+*.db-wal
+
+# Pruebas, cobertura y logs
+tests
+coverage
+logs
+*.log
+
+# Git, CI y documentación
+.git
+.gitignore
+.github
+.husky
+docs
+reporte
+*.md
+
+# Editor / SO
+.vscode
+.idea
+.DS_Store
+Thumbs.db
