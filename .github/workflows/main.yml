@@ -115,7 +115,11 @@ jobs:
               echo "|---|---|---|---|"
               jq -r '.stats | "| \(.expected) | \(.unexpected) | \(.flaky) | \(.skipped) |"' "$F"
               FALLAS=$(jq -r '[.. | objects | select(has("ok") and has("tests") and .ok == false) | "- ❌ " + .title] | .[]' "$F")
-              [ -n "$FALLAS" ] && echo "" && echo "**Pruebas fallidas:**" && echo "$FALLAS"
+               if [ -n "$FALLAS" ]; then
+                echo ""
+                echo "**Pruebas fallidas:**"
+                echo "$FALLAS"
+              fi
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
