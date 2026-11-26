@@ -21,3 +21,8 @@ reporte/*.toc
 
 # Copias que deja Claude
 Claude outputs/
+
+# Playwright
+playwright-report/
+test-results/
+jest-resultados.json

@@ -181,6 +181,8 @@ router.get("/backup", (req, res) => {
 });
 
 app.use("/api", router);
+// Frontend (carpeta public/): http://<IP_EC2>/ muestra la interfaz web.
+app.use(express.static(path.join(__dirname, "public")));
 app.use("/", router);
 
 // ---------- Ruta inexistente ----------

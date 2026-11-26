@@ -37,6 +37,7 @@ ENV GIT_SHA=$GIT_SHA \
 
 COPY --from=deps --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node package.json app.js db.js socket.js server.js ./
+COPY --chown=node:node public ./public
 
 RUN mkdir -p /app/data /app/backups && chown -R node:node /app/data /app/backups
 
