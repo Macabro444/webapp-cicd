@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────
+# OpenTelemetry Collector (RF-05): métricas de infraestructura
+# de la instancia EC2 → OpenObserve.
+# Corre en la EC2 con --network host y el disco del host montado
+# en /hostfs (solo lectura). Lo copia y levanta el pipeline.
+# ─────────────────────────────────────────────────────────────
+receivers:
+  hostmetrics:
+    collection_interval: 15s
+    root_path: /hostfs
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      load: {}
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      paging: {}
+      network: {}
+      disk: {}
+      filesystem:
+        exclude_mount_points:
+          mount_points: ["/hostfs/proc/*", "/hostfs/sys/*", "/hostfs/run/*", "/hostfs/snap/*", "/hostfs/var/lib/docker/*"]
+          match_type: regexp
+        exclude_fs_types:
+          fs_types: [overlay, tmpfs, squashfs, proc, sysfs, devtmpfs, nsfs, cgroup2]
+          match_type: strict
+        metrics:
+          system.filesystem.utilization:
+            enabled: true
+      processes: {}
+
+processors:
+  resourcedetection:
+    detectors: [env, system]
+    system:
+      hostname_sources: [os]
+  resource:
+    attributes:
+      - key: service.name
+        value: ec2-olainstancia
+        action: upsert
+  batch: {}
+
+exporters:
+  otlphttp/openobserve:
+    endpoint: http://localhost:5080/api/default
+    headers:
+      Authorization: "Basic ${env:OPENOBSERVE_AUTH}"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlphttp/openobserve]

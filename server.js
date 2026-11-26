@@ -1,3 +1,5 @@
+// OpenTelemetry debe cargarse antes que express
+require("./tracing");
 const app = require("./app");
 const { db } = require("./db");
 const { iniciarSocketServer } = require("./socket");

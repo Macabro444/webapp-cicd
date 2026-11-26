@@ -2,8 +2,11 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const { db, DB_PATH } = require("./db");
+const { middlewareTelemetria, registrarExcepcion } = require("./telemetria");
 
 const app = express();
+// Métricas y logs de cada petición (OpenTelemetry)
+app.use(middlewareTelemetria);
 app.use(express.json());
 
 // Todas las rutas viven en un Router que se monta en /api (URL pública:
@@ -180,6 +183,17 @@ router.get("/backup", (req, res) => {
   });
 });
 
+// ---------- 11. GET /simular-error (demo de observabilidad: excepción → 500) ----------
+router.get("/simular-error", () => {
+  throw new Error("Error simulado para probar logs, trazas y alertas");
+});
+
+// ---------- 12. GET /simular-lento?ms= (demo de observabilidad: latencia alta) ----------
+router.get("/simular-lento", (req, res) => {
+  const ms = Math.min(Math.max(Number(req.query.ms) || 1500, 0), 5000);
+  setTimeout(() => send(res, 200, { esperado_ms: ms }), ms);
+});
+
 app.use("/api", router);
 // Frontend (carpeta public/): http://<IP_EC2>/ muestra la interfaz web.
 app.use(express.static(path.join(__dirname, "public")));
@@ -192,6 +206,7 @@ app.use((req, res) => send(res, 404, { error: "Ruta no encontrada" }));
 app.use((err, req, res, next) => {
   if (err.type === "entity.parse.failed")
     return send(res, 400, { error: "El cuerpo de la petición no es un JSON válido" });
+  registrarExcepcion(err, req);
   send(res, 500, { error: "Error interno del servidor" });
 });
 

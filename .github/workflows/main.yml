@@ -9,6 +9,8 @@
 #
 #  Cada resultado (éxito/fallo, commit, rama, usuario) y cada despliegue
 #  se registra en OpenObserve (stream "cicd") vía API HTTP/JSON.
+#  En la EC2 la app emite logs/métricas/trazas por OTLP y un
+#  OpenTelemetry Collector envía las métricas del servidor.
 #
 #  Secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, EC2_HOST, EC2_USERNAME,
 #           EC2_SSH_KEY, OPENOBSERVE_URL, OPENOBSERVE_AUTH
@@ -115,7 +117,7 @@ jobs:
               echo "|---|---|---|---|"
               jq -r '.stats | "| \(.expected) | \(.unexpected) | \(.flaky) | \(.skipped) |"' "$F"
               FALLAS=$(jq -r '[.. | objects | select(has("ok") and has("tests") and .ok == false) | "- ❌ " + .title] | .[]' "$F")
-               if [ -n "$FALLAS" ]; then
+              if [ -n "$FALLAS" ]; then
                 echo ""
                 echo "**Pruebas fallidas:**"
                 echo "$FALLAS"
@@ -199,6 +201,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Copiar configuración del OpenTelemetry Collector a la EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: observabilidad/otel-collector.yaml
+          target: /home/${{ secrets.EC2_USERNAME }}/
+
       - name: Desplegar vía SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -225,7 +236,20 @@ jobs:
               -p 80:8080 -p 6061:6061 \
               -v webapp-data:/app/data \
               -v webapp-backups:/app/backups \
+              -e OTEL_EXPORTER_OTLP_ENDPOINT=http://openobserve:5080/api/default \
+              -e OPENOBSERVE_AUTH="${{ secrets.OPENOBSERVE_AUTH }}" \
+              -e OTEL_SERVICE_NAME=webapp-inventario \
               "$IMAGE"
+
+            echo "▶ OpenTelemetry Collector (métricas de la EC2: CPU, RAM, red, disco)"
+            sudo docker rm -f otel-collector 2>/dev/null || true
+            sudo docker run -d --name otel-collector \
+              --restart unless-stopped \
+              --network host \
+              -v /:/hostfs:ro \
+              -v "$HOME/observabilidad/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro" \
+              -e OPENOBSERVE_AUTH="${{ secrets.OPENOBSERVE_AUTH }}" \
+              otel/opentelemetry-collector-contrib:latest
 
             echo "▶ Limpiando imágenes antiguas"
             sudo docker image prune -af --filter "until=24h" || true
